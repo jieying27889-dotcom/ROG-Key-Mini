@@ -1,73 +1,111 @@
 # RogKeyMini
 
-RogKeyMini is a small Windows desktop utility for a 2021 ROG Zephyrus G14 with broken `F2`, `F7`, and `-` keys.
+RogKeyMini 是一个面向华硕 `ROG Zephyrus G14 2021` 的轻量级 `Windows（微软桌面操作系统）` 桌面工具，主要用于在少数物理按键失效时，提供可继续使用的替代输入方案。
 
-This repository is being prepared for an initial public release as `v0.1.0`. The goal of this first version is narrow and practical: provide a stable reference implementation for people who need a lightweight workaround for a few failed physical keys on this laptop model.
+这个仓库当前准备作为首个公开版本 `v0.1.0` 发布。首版目标很明确：先把已经验证过、能够稳定工作的核心能力整理出来，给遇到类似键盘坏键问题的人一个可参考、可复现、可继续扩展的起点。
 
-## What `v0.1.0` includes
+## 项目简介
 
-Current `P0` scope:
+当前这个工具主要针对以下场景：
 
-- floating window
-- tray mode
-- global hotkeys
-- key simulation for `F2`, `F7`, `-`, and `_`
-- screen brightness down hook
-- keyboard backlight down hook
-- logging and safe failure behavior
+- `F2` 物理键失效
+- `F7` 物理键失效
+- `-` 物理键失效
+- 需要用悬浮窗快速触发替代操作
+- 需要在不大幅改动系统环境的前提下保留亮度和键盘背光控制
 
-## Hardware control strategy
+## 当前版本包含的能力
 
-Keyboard backlight currently uses a layered fallback:
+当前 `P0（首个可用阶段）` 范围包括：
 
-1. `AsusAcpiService` tries the `ATKACPI` device path for a minimal hotkey-style command.
-2. `AsusHidService` acts as a fallback and tries an ASUS HID feature report path.
-3. Both paths are best-effort only and must fail safely without crashing the app.
+- 悬浮窗操作面板
+- 托盘模式
+- 全局热键
+- `F2`、`F7`、`-`、`_` 的按键模拟
+- 屏幕亮度降低控制
+- 键盘背光降低控制
+- 日志记录与安全失败保护
 
-The current HID path stores an estimated last-known brightness level in config because `P0` does not yet read back the real hardware brightness state.
+## 硬件控制策略
 
-## Current status
+键盘背光目前采用分层回退策略：
 
-This repository now contains a working WPF project skeleton plus the current `P0` control paths for:
+1. `AsusAcpiService（华硕 ACPI 控制服务）` 先尝试 `ATKACPI` 设备路径，走尽量接近原生热键的控制方式。
+2. `AsusHidService（华硕 HID 控制服务）` 作为后备路径，尝试通过 `HID（人机接口设备）` 特征报告进行控制。
+3. 两条路径都必须安全失败，不能因为硬件调用异常导致程序崩溃。
 
-- tray integration
-- tray config-file entry
-- global hotkey registration
-- key simulation
-- WMI screen brightness down
-- Asus ACPI first keyboard backlight down
-- Asus HID fallback keyboard backlight down
-- config persistence and normalization
+当前 `HID（人机接口设备）` 路径使用的是“上次估算亮度级别”，因为现阶段还没有完整接入真实硬件状态回读。
 
-This repository also includes a local offline `NuGet` package source in `.nuget-local` plus a repo-level `NuGet.Config`, because direct `dotnet restore` access to `https://api.nuget.org/v3/index.json` is failing in the current machine environment.
+## 当前仓库状态
 
-## Project layout
+这个仓库目前已经包含：
 
-The project is maintained as source plus portable build output:
+- 可工作的 `WPF（Windows 图形界面框架）` 工程骨架
+- 托盘集成
+- 配置文件读写
+- 全局热键注册
+- 按键模拟
+- 基于 `WMI（Windows 管理规范）` 的屏幕亮度降低
+- 基于 `ACPI（高级配置与电源接口）` 的键盘背光主路径尝试
+- 基于 `HID（人机接口设备）` 的键盘背光回退路径
+- 配置持久化与归一化处理
 
-- source files live under `src/RogKeyMini`
-- build output is redirected to `artifacts/bin`
-- intermediate build files are redirected to `artifacts/obj`
-- runtime `config.json` and `logs` stay beside the running `RogKeyMini.exe` for portable use
+此外，仓库里保留了本地离线 `NuGet（.NET 包管理器）` 包源 `.nuget-local` 和仓库级 `NuGet.Config（NuGet 配置文件）`。原因是当前机器环境下直接访问官方 `NuGet（.NET 包管理器）` 源并不稳定，因此需要保留一个可复现的本地依赖来源。
 
-## Planned next version
+## 目录结构
 
-The first public release intentionally stays focused. After `v0.1.0`, the next practical improvements are expected to be:
+```text
+D:\001\ROG Key Mini2  # 项目根目录
+├─ .nuget-local/  # 本地离线 NuGet 包源
+├─ artifacts/  # 构建输出与中间产物目录（已忽略，不提交）
+├─ docs/  # 项目文档目录
+├─ src/  # 源代码目录
+├─ .gitignore  # Git 忽略规则
+├─ Directory.Build.props  # .NET 构建输出重定向配置
+├─ LICENSE  # 开源许可证
+├─ NuGet.Config  # 仓库级 NuGet 包源配置
+├─ README.md  # 项目首页说明
+└─ RogKeyMini.sln  # Visual Studio 解决方案文件
+```
 
-1. custom remapping for failed physical keys, so users can define which broken key should trigger which shortcut
-2. a two-row window layout instead of the current single-row layout
-3. more device-specific configuration once behavior is verified on real hardware
+## 发布定位
 
-## Release positioning
+如果现在公开发布，这个项目最合适的定位是：
 
-If you publish this repository now, the clearest description is:
+- 当前版本：针对明确坏键场景的稳定初始方案
+- 目标读者：遇到相似 `ASUS（华硕）` 笔记本键盘故障问题的用户
+- 使用价值：既可以直接参考实现，也可以作为后续自行修改的基础
 
-- current version: stable initial workaround for one concrete broken-key scenario
-- target audience: users with similar ASUS laptop keyboard failures
-- future direction: configurable remapping and improved layout, without changing the purpose of the tool
+## 后续计划
 
-## Recommended validation before release
+当前首版不刻意扩展功能范围，后续优先级更高的演进方向是：
 
-1. Run the app on the target machine and validate ACPI and HID keyboard backlight behavior.
-2. Verify the hotkey and no-activate floating window behavior on the target machine.
-3. Decide whether HID should remain fallback-only or become the practical primary path on this model.
+1. 增加“自定义坏键映射”
+   让用户自己指定哪个失效物理键映射到哪个快捷操作。
+2. 把当前单排按钮布局改成双排布局
+   这样界面更紧凑，也更符合这个工具的使用场景。
+3. 根据更多真实设备反馈继续调整硬件控制策略
+   进一步确认 `ACPI（高级配置与电源接口）` 和 `HID（人机接口设备）` 在不同机型上的适配表现。
+
+## 使用建议
+
+如果你准备直接试用，建议先在目标机器上重点验证下面几项：
+
+1. 悬浮窗是否能正常显示、点击且不抢输入焦点。
+2. `F2`、`F7`、`-`、`_` 的替代输入是否符合你的实际使用习惯。
+3. 屏幕亮度降低和键盘背光降低是否在你的设备上行为正常。
+
+## 开源许可
+
+本项目采用 `MIT（宽松开源许可）` 许可证。
+
+- 你可以自由使用、修改、分发本项目代码
+- 你可以把它用于个人项目或二次开发
+- 你需要保留原始版权声明和许可文本
+- 作者不对使用结果提供担保
+
+详细内容见 [LICENSE](</D:/001/ROG Key Mini2/LICENSE>) 和 [许可证说明.md](</D:/001/ROG Key Mini2/docs/许可证说明.md>)。
+
+## 仓库地址
+
+- `GitHub（代码托管平台）`：<https://github.com/jieying27889-dotcom/ROG-Key-Mini>
