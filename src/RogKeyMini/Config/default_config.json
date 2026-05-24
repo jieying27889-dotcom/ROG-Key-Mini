@@ -1,0 +1,47 @@
+{
+  "Window": {
+    "说明": "悬浮窗设置：Left(左边距), Top(上边距), Opacity(不透明度 0.2-1.0), Topmost(是否置顶)",
+    "Left": 1200,
+    "Top": 300,
+    "Opacity": 0.95,
+    "Topmost": true
+  },
+  "Hotkeys": {
+    "说明": "全局快捷键设置：支持注册如 Ctrl+2, Alt+7 等，用于模拟按键或调节硬件",
+    "SendF2": "Ctrl+2",
+    "SendF7": "Alt+7",
+    "SendMinus": "Alt+9",
+    "SendUnderscore": "Alt+0",
+    "KeyboardBacklightDown": "Alt+[",
+    "ScreenBrightnessDown": "Alt+]",
+    "ToggleWindow": "Ctrl+Shift+1"
+  },
+  "Brightness": {
+    "说明": "屏幕亮度调节：ScreenStep(每次减少的百分比), ScreenMin(最低亮度限制)",
+    "ScreenStep": 10,
+    "ScreenMin": 0
+  },
+  "KeyboardBacklight": {
+    "说明": "键盘背光设置：LastKnownLevel(当前背光亮度级), MaxLevel(最大亮度级，通常为3)",
+    "LastKnownLevel": 3,
+    "MaxLevel": 3
+  },
+  "Fan": {
+    "ManualFanEnabled": false,
+    "LastManualFanSessionClosedSafely": true,
+    "UpdateIntervalMs": 1000,
+    "TemperatureAverageSeconds": 6
+  },
+  "CpuPower": {
+    "MaxProcessorStateAc": 85,
+    "BoostModeAc": "Disabled"
+  },
+  "AltMonitor": {
+    "说明": "Alt键粘滞监控：MonitorLeftAlt/MonitorRightAlt(是否监控左/右Alt), StuckThresholdMs(判定卡住的长按时间毫秒), AutoReleaseEnabled(是否自动释放), NotificationsEnabled(是否启用提示)",
+    "MonitorLeftAlt": true,
+    "MonitorRightAlt": true,
+    "StuckThresholdMs": 2000,
+    "AutoReleaseEnabled": true,
+    "NotificationsEnabled": true
+  }
+}
