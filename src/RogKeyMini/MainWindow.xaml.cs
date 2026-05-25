@@ -5,12 +5,22 @@ using RogKeyMini.Logging;
 using RogKeyMini.UI;
 using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
+using Forms = System.Windows.Forms;
+using WpfButton = System.Windows.Controls.Button;
+using WpfPoint = System.Windows.Point;
 
 namespace RogKeyMini;
 
 public partial class MainWindow : Window
 {
+    private const int ButtonsPerRow = 5;
+    private const double WindowWidthPixels = 520;
+    private const double WindowBaseHeightPixels = 92;
+    private const double WindowRowHeightPixels = 62;
+
     private readonly AppConfig _config;
     private readonly ConfigService _configService;
     private readonly LogService _logService;
@@ -18,6 +28,12 @@ public partial class MainWindow : Window
     private readonly KeySender _keySender;
     private readonly ScreenBrightnessService _screenBrightnessService;
     private readonly KeyboardBacklightService _keyboardBacklightService;
+
+    private WpfButton? _autoReleaseButton;
+    private double _windowHeight;
+    private double _windowWidth;
+    private double _windowLeft;
+    private double _windowTop;
 
     public MainWindow(
         AppConfig config,
@@ -40,7 +56,9 @@ public partial class MainWindow : Window
 
         _floatingWindowService.Attach(this, _config.Window);
         MouseLeftButtonDown += OnMouseLeftButtonDown;
- 
+        Loaded += OnLoaded;
+
+        BuildButtons();
         UpdateAutoReleaseButtonVisual();
     }
 
@@ -68,22 +86,52 @@ public partial class MainWindow : Window
         _keyboardBacklightService.TryDecrease();
     }
 
+    public void ExecuteConfiguredButton(PanelButtonConfig buttonConfig)
+    {
+        ExecuteButtonAction(buttonConfig);
+    }
+
     public void ToggleVisibility()
     {
         if (IsVisible)
         {
             Hide();
+            return;
         }
-        else
+
+        Show();
+        ActivateWindowFromConfig();
+    }
+
+    public void ReloadFromConfig()
+    {
+        Topmost = _config.Window.Topmost;
+        Opacity = _config.Window.Opacity;
+        BuildButtons();
+        UpdateAutoReleaseButtonVisual();
+        ApplyWindowPosition(ClampWindowPosition(new WpfPoint(_config.Window.Left, _config.Window.Top)));
+    }
+
+    public void ResetToPrimaryScreenCenter()
+    {
+        var screen = Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0];
+        var workArea = screen.WorkingArea;
+        var targetLeft = workArea.Left + Math.Max(0, (workArea.Width - _windowWidth) / 2d);
+        var targetTop = workArea.Top + Math.Max(0, (workArea.Height - _windowHeight) / 2d);
+
+        if (!IsVisible)
         {
             Show();
         }
+
+        ApplyWindowPosition(new WpfPoint(targetLeft, targetTop));
+        PersistWindowRuntimeState();
+        Activate();
     }
 
     protected override void OnClosing(CancelEventArgs e)
     {
-        _config.Window.Left = Left;
-        _config.Window.Top = Top;
+        PersistWindowRuntimeState();
         _configService.SaveRuntimeState(_config, _logService);
 
         if (!AllowClose)
@@ -96,65 +144,240 @@ public partial class MainWindow : Window
         base.OnClosing(e);
     }
 
-    private void F2Button_OnClick(object sender, RoutedEventArgs e) => SendF2();
+    private void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        ApplyWindowPosition(ClampWindowPosition(_windowLeft == 0 && _windowTop == 0
+            ? new WpfPoint(Left, Top)
+            : new WpfPoint(_windowLeft, _windowTop)));
+    }
 
-    private void F7Button_OnClick(object sender, RoutedEventArgs e) => SendF7();
+    private void BuildButtons()
+    {
+        ButtonsHost.Children.Clear();
+        _autoReleaseButton = null;
 
-    private void MinusButton_OnClick(object sender, RoutedEventArgs e) => SendMinus();
+        var buttons = _config.Panel.Buttons ?? PanelButtonConfig.CreateDefaults();
+        foreach (var buttonConfig in buttons)
+        {
+            var button = new WpfButton
+            {
+                Style = (Style)FindResource("RogButtonStyle"),
+                Tag = buttonConfig,
+                ToolTip = BuildButtonToolTip(buttonConfig),
+                Content = CreateButtonContent(buttonConfig.Label)
+            };
+            button.Click += DynamicButton_OnClick;
 
-    private void UnderscoreButton_OnClick(object sender, RoutedEventArgs e) => SendUnderscore();
+            if (NormalizeAction(buttonConfig.Action) == PanelButtonAction.ToggleAutoRelease)
+            {
+                _autoReleaseButton = button;
+            }
 
-    private void KeyboardBacklightButton_OnClick(object sender, RoutedEventArgs e) => DecreaseKeyboardBacklight();
+            ButtonsHost.Children.Add(button);
+        }
 
-    private void ScreenBrightnessButton_OnClick(object sender, RoutedEventArgs e) => DecreaseScreenBrightness();
+        var rows = Math.Max(1, (int)Math.Ceiling(buttons.Count / (double)ButtonsPerRow));
+        ButtonsHost.Rows = rows;
+        _windowWidth = WindowWidthPixels;
+        _windowHeight = WindowBaseHeightPixels + rows * WindowRowHeightPixels;
+        Width = _windowWidth;
+        Height = _windowHeight;
 
-    private void OskButton_OnClick(object sender, RoutedEventArgs e)
+        _windowLeft = Left;
+        _windowTop = Top;
+    }
+
+    private static object CreateButtonContent(string label)
+    {
+        return new TextBlock
+        {
+            Text = label,
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = System.Windows.VerticalAlignment.Center,
+            HorizontalAlignment = System.Windows.HorizontalAlignment.Center
+        };
+    }
+
+    private static string BuildButtonToolTip(PanelButtonConfig buttonConfig)
+    {
+        return string.Equals(buttonConfig.Action, "SendKey", StringComparison.OrdinalIgnoreCase)
+            ? $"模拟键位：{buttonConfig.Gesture}"
+            : $"动作：{buttonConfig.Action}";
+    }
+
+    private void DynamicButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not WpfButton { Tag: PanelButtonConfig buttonConfig })
+        {
+            return;
+        }
+
+        ExecuteButtonAction(buttonConfig);
+    }
+
+    private void ExecuteButtonAction(PanelButtonConfig buttonConfig)
+    {
+        switch (NormalizeAction(buttonConfig.Action))
+        {
+            case PanelButtonAction.SendKey:
+                if (string.IsNullOrWhiteSpace(buttonConfig.Gesture))
+                {
+                    _logService.Warn($"按钮 {buttonConfig.Label} 未配置 Gesture。");
+                    return;
+                }
+
+                _keySender.SendGesture(buttonConfig.Gesture, buttonConfig.Label);
+                break;
+            case PanelButtonAction.KeyboardBacklightDown:
+                DecreaseKeyboardBacklight();
+                break;
+            case PanelButtonAction.ScreenBrightnessDown:
+                DecreaseScreenBrightness();
+                break;
+            case PanelButtonAction.LaunchOsk:
+                LaunchOsk();
+                break;
+            case PanelButtonAction.ToggleAutoRelease:
+                ToggleAutoRelease();
+                break;
+            default:
+                _logService.Warn($"未知按钮动作：{buttonConfig.Action}。");
+                break;
+        }
+    }
+
+    private void LaunchOsk()
     {
         try
         {
-            string windir = Environment.GetEnvironmentVariable("windir") ?? @"C:\Windows";
-            string sysnativePath = System.IO.Path.Combine(windir, "Sysnative", "osk.exe");
-            string system32Path = System.IO.Path.Combine(windir, "System32", "osk.exe");
- 
+            string windowsDirectory = Environment.GetEnvironmentVariable("windir") ?? @"C:\Windows";
+            string sysnativePath = System.IO.Path.Combine(windowsDirectory, "Sysnative", "osk.exe");
+            string system32Path = System.IO.Path.Combine(windowsDirectory, "System32", "osk.exe");
             string oskPath = System.IO.File.Exists(sysnativePath) ? sysnativePath : system32Path;
- 
+
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = oskPath,
                 UseShellExecute = true
             });
-            _logService.Info("从界面成功启动屏幕键盘 (OSK)。");
+            _logService.Info("已从界面启动屏幕键盘(OSK)。");
         }
-        catch (System.Exception ex)
+        catch (Exception ex)
         {
-            _logService.Error("从界面启动屏幕键盘 (OSK) 失败。", ex);
+            _logService.Error("从界面启动屏幕键盘(OSK)失败。", ex);
         }
     }
- 
-    private void AutoReleaseButton_OnClick(object sender, RoutedEventArgs e)
+
+    private void ToggleAutoRelease()
     {
         _config.AltMonitor.AutoReleaseEnabled = !_config.AltMonitor.AutoReleaseEnabled;
         UpdateAutoReleaseButtonVisual();
-        _logService.Info($"通过界面切换了自动释放状态。当前状态: {_config.AltMonitor.AutoReleaseEnabled}");
+        _configService.Save(_config, _logService);
+        _logService.Info($"通过界面切换了自动释放状态。当前状态：{_config.AltMonitor.AutoReleaseEnabled}");
     }
- 
+
     private void UpdateAutoReleaseButtonVisual()
     {
-        if (_config.AltMonitor.AutoReleaseEnabled)
+        if (_autoReleaseButton is null)
         {
-            AutoReleaseBtn.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 46, 80)); // ROG红
+            return;
         }
-        else
-        {
-            AutoReleaseBtn.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(170, 170, 170)); // 浅灰
-        }
+
+        _autoReleaseButton.Foreground = _config.AltMonitor.AutoReleaseEnabled
+            ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 46, 80))
+            : new SolidColorBrush(System.Windows.Media.Color.FromRgb(170, 170, 170));
     }
- 
+
     private void OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState == MouseButtonState.Pressed)
+        if (e.ButtonState != MouseButtonState.Pressed)
+        {
+            return;
+        }
+
+        try
         {
             DragMove();
         }
+        finally
+        {
+            CaptureWindowPosition();
+            ApplyWindowPosition(ClampWindowPosition(new WpfPoint(_windowLeft, _windowTop)));
+            PersistWindowRuntimeState();
+        }
     }
+
+    private void ActivateWindowFromConfig()
+    {
+        ApplyWindowPosition(ClampWindowPosition(new WpfPoint(_config.Window.Left, _config.Window.Top)));
+        Activate();
+    }
+
+    private void CaptureWindowPosition()
+    {
+        _windowLeft = Left;
+        _windowTop = Top;
+    }
+
+    private void ApplyWindowPosition(WpfPoint point)
+    {
+        Width = _windowWidth;
+        Height = _windowHeight;
+        Left = point.X;
+        Top = point.Y;
+        _windowLeft = point.X;
+        _windowTop = point.Y;
+    }
+
+    private WpfPoint ClampWindowPosition(WpfPoint point)
+    {
+        var workArea = GetCurrentWorkArea();
+        var maxLeft = Math.Max(workArea.Left, workArea.Right - _windowWidth);
+        var maxTop = Math.Max(workArea.Top, workArea.Bottom - _windowHeight);
+        var safeLeft = Math.Clamp(point.X, workArea.Left, maxLeft);
+        var safeTop = Math.Clamp(point.Y, workArea.Top, maxTop);
+        return new WpfPoint(safeLeft, safeTop);
+    }
+
+    private Rect GetCurrentWorkArea()
+    {
+        var handle = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+        var screen = handle == IntPtr.Zero
+            ? (Forms.Screen.PrimaryScreen ?? Forms.Screen.AllScreens[0])
+            : Forms.Screen.FromHandle(handle);
+        var workingArea = screen.WorkingArea;
+        return new Rect(workingArea.Left, workingArea.Top, workingArea.Width, workingArea.Height);
+    }
+
+    private void PersistWindowRuntimeState()
+    {
+        _config.Window.Left = _windowLeft;
+        _config.Window.Top = _windowTop;
+        _config.Window.AutoHideEnabled = false;
+    }
+
+    private static PanelButtonAction NormalizeAction(string? action)
+    {
+        return action?.Trim().ToUpperInvariant() switch
+        {
+            "SENDKEY" => PanelButtonAction.SendKey,
+            "KEYBOARDBACKLIGHTDOWN" => PanelButtonAction.KeyboardBacklightDown,
+            "SCREENBRIGHTNESSDOWN" => PanelButtonAction.ScreenBrightnessDown,
+            "LAUNCHOSK" => PanelButtonAction.LaunchOsk,
+            "TOGGLEAUTORELEASE" => PanelButtonAction.ToggleAutoRelease,
+            _ => PanelButtonAction.Unknown
+        };
+    }
+
+}
+
+internal enum PanelButtonAction
+{
+    Unknown,
+    SendKey,
+    KeyboardBacklightDown,
+    ScreenBrightnessDown,
+    LaunchOsk,
+    ToggleAutoRelease
 }

@@ -1,5 +1,5 @@
-using RogKeyMini.Logging;
 using RogKeyMini.Interop;
+using RogKeyMini.Logging;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
@@ -10,14 +10,7 @@ public sealed class KeySender
     private readonly LogService _logService;
     private static readonly object InputLock = new();
 
-    public bool IsSending { get; private set; }
-
-    public KeySender(LogService logService)
-    {
-        _logService = logService;
-    }
-
-    private static readonly ushort[] Modifiers = new ushort[]
+    private static readonly ushort[] PhysicalModifiers =
     {
         0xA0, // VK_LSHIFT
         0xA1, // VK_RSHIFT
@@ -29,6 +22,13 @@ public sealed class KeySender
         0x5C  // VK_RWIN
     };
 
+    public KeySender(LogService logService)
+    {
+        _logService = logService;
+    }
+
+    public bool IsSending { get; private set; }
+
     public void SendF2() => SendVirtualKey(0x71, "F2");
 
     public void SendF7() => SendVirtualKey(0x76, "F7");
@@ -37,137 +37,25 @@ public sealed class KeySender
 
     public void SendMinus(ushort triggerKey) => SendAfterHotkeyRelease(triggerKey, SendMinus, "-");
 
-    public void SendUnderscore() => SendUnderscoreCore(null);
+    public void SendUnderscore() => SendGesture("_", "_");
 
     public void SendUnderscore(ushort triggerKey) => SendAfterHotkeyRelease(triggerKey, SendUnderscore, "_");
 
-    private void SendUnderscoreCore(ushort? triggerKey, bool restoreModifiers = true)
+    public void SendGesture(string gesture, string? nameOverride = null)
     {
-        const ushort vkShift = 0x10;
-        const ushort vkMinus = 0xBD;
-
-        var core = new[]
+        if (!KeyGestureParser.TryParseForSend(gesture, out var parsed) || parsed is null)
         {
-            CreateKeyInput(vkShift, 0),
-            CreateKeyInput(vkMinus, 0),
-            CreateKeyInput(vkMinus, NativeMethods.KEYEVENTF_KEYUP),
-            CreateKeyInput(vkShift, NativeMethods.KEYEVENTF_KEYUP)
-        };
-
-        SendKeysWithReleasedContext(core, "_", triggerKey, restoreModifiers);
-    }
-
-    private void SendVirtualKey(ushort virtualKey, string name, ushort? triggerKey = null, bool restoreModifiers = true)
-    {
-        var core = new[]
-        {
-            CreateKeyInput(virtualKey, 0),
-            CreateKeyInput(virtualKey, NativeMethods.KEYEVENTF_KEYUP)
-        };
-
-        SendKeysWithReleasedContext(core, name, triggerKey, restoreModifiers);
-    }
-
-    private void SendKeysWithReleasedContext(
-        NativeMethods.INPUT[] coreInputs,
-        string name,
-        ushort? triggerKey,
-        bool restoreModifiers)
-    {
-        lock (InputLock)
-        {
-            IsSending = true;
-            try
-            {
-                var activeModifiers = new System.Collections.Generic.List<ushort>();
-                foreach (var mod in Modifiers)
-                {
-                    if ((NativeMethods.GetAsyncKeyState(mod) & 0x8000) != 0)
-                    {
-                        activeModifiers.Add(mod);
-                    }
-                }
- 
-                var releaseInputs = new System.Collections.Generic.List<NativeMethods.INPUT>();
- 
-                // 1. 先释放触发热键的主键，避免 Alt+9 / Alt+0 仍处于按下状态时干扰后续注入。
-                if (triggerKey is ushort key)
-                {
-                    releaseInputs.Add(CreateKeyInput(key, NativeMethods.KEYEVENTF_KEYUP));
-                }
-
-                // 2. 释放所有正处于按下状态的修饰键
-                foreach (var mod in activeModifiers)
-                {
-                    releaseInputs.Add(CreateKeyInput(mod, NativeMethods.KEYEVENTF_KEYUP));
-                }
-
-                if (releaseInputs.Count > 0)
-                {
-                    var releaseBatch = releaseInputs.ToArray();
-                    var released = NativeMethods.SendInput(
-                        (uint)releaseBatch.Length,
-                        releaseBatch,
-                        Marshal.SizeOf<NativeMethods.INPUT>());
-
-                    if (released != releaseBatch.Length)
-                    {
-                        _logService.Warn($"SendInput failed while releasing hotkey context for {name}. Sent={released}.");
-                        return;
-                    }
-                }
-
-                var sent = NativeMethods.SendInput((uint)coreInputs.Length, coreInputs, Marshal.SizeOf<NativeMethods.INPUT>());
-
-                if (sent != coreInputs.Length)
-                {
-                    _logService.Warn($"SendInput failed for {name}. Sent={sent}.");
-                    return;
-                }
-
-                if (restoreModifiers && activeModifiers.Count > 0)
-                {
-                    var restoreInputs = new System.Collections.Generic.List<NativeMethods.INPUT>();
-
-                    // 单独分批恢复仍被物理按住的修饰键，避免输入框把目标键误判成 Alt 组合，
-                    // 同时也不让键盘逻辑状态长期停留在“Alt 已弹起”的异常状态。
-                    Thread.Sleep(30);
-
-                    for (int i = activeModifiers.Count - 1; i >= 0; i--)
-                    {
-                        var modifier = activeModifiers[i];
-                        if ((NativeMethods.GetAsyncKeyState(modifier) & 0x8000) != 0)
-                        {
-                            restoreInputs.Add(CreateKeyInput(modifier, 0));
-                        }
-                    }
-
-                    if (restoreInputs.Count > 0)
-                    {
-                        var restoreBatch = restoreInputs.ToArray();
-                        var restored = NativeMethods.SendInput(
-                            (uint)restoreBatch.Length,
-                            restoreBatch,
-                            Marshal.SizeOf<NativeMethods.INPUT>());
-
-                        if (restored != restoreBatch.Length)
-                        {
-                            _logService.Warn($"SendInput partially restored modifiers for {name}. Sent={restored}/{restoreBatch.Length}.");
-                        }
-                    }
-                }
- 
-                _logService.Info($"Sent key {name}.");
-            }
-            catch (Exception ex)
-            {
-                _logService.Error($"Failed to send key {name}.", ex);
-            }
-            finally
-            {
-                IsSending = false;
-            }
+            _logService.Warn($"Unsupported send gesture: {gesture}.");
+            return;
         }
+
+        var coreInputs = BuildGestureInputs(parsed);
+        SendInputsWithReleasedContext(coreInputs, nameOverride ?? parsed.Gesture, null, true);
+    }
+
+    public void SendGestureAfterHotkeyRelease(string gesture, ushort triggerKey, string? nameOverride = null)
+    {
+        SendAfterHotkeyRelease(triggerKey, () => SendGesture(gesture, nameOverride), nameOverride ?? gesture);
     }
 
     public void ReleaseKey(ushort virtualKey, string name)
@@ -182,7 +70,6 @@ public sealed class KeySender
                 };
 
                 var sent = NativeMethods.SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<NativeMethods.INPUT>());
-
                 if (sent != inputs.Length)
                 {
                     _logService.Warn($"释放 {name} 键的 SendInput 失败。发送数={sent}。");
@@ -195,6 +82,151 @@ public sealed class KeySender
             {
                 _logService.Error($"释放 {name} 键失败。", ex);
             }
+        }
+    }
+
+    private void SendVirtualKey(ushort virtualKey, string name, ushort? triggerKey = null, bool restoreModifiers = true)
+    {
+        var coreInputs = new[]
+        {
+            CreateKeyInput(virtualKey, 0),
+            CreateKeyInput(virtualKey, NativeMethods.KEYEVENTF_KEYUP)
+        };
+
+        SendInputsWithReleasedContext(coreInputs, name, triggerKey, restoreModifiers);
+    }
+
+    private void SendInputsWithReleasedContext(
+        NativeMethods.INPUT[] coreInputs,
+        string name,
+        ushort? triggerKey,
+        bool restoreModifiers)
+    {
+        lock (InputLock)
+        {
+            IsSending = true;
+            try
+            {
+                var activeModifiers = GetPressedModifiers();
+                var releaseInputs = new List<NativeMethods.INPUT>();
+
+                if (triggerKey is ushort key)
+                {
+                    releaseInputs.Add(CreateKeyInput(key, NativeMethods.KEYEVENTF_KEYUP));
+                }
+
+                foreach (var modifier in activeModifiers)
+                {
+                    releaseInputs.Add(CreateKeyInput(modifier, NativeMethods.KEYEVENTF_KEYUP));
+                }
+
+                if (!SendInputBatch(releaseInputs, $"release hotkey context for {name}"))
+                {
+                    return;
+                }
+
+                if (!SendInputBatch(coreInputs, name))
+                {
+                    return;
+                }
+
+                if (restoreModifiers)
+                {
+                    RestoreStillPressedModifiers(activeModifiers, name);
+                }
+
+                _logService.Info($"Sent key gesture {name}.");
+            }
+            catch (Exception ex)
+            {
+                _logService.Error($"Failed to send key gesture {name}.", ex);
+            }
+            finally
+            {
+                IsSending = false;
+            }
+        }
+    }
+
+    private static NativeMethods.INPUT[] BuildGestureInputs(ParsedKeyGesture gesture)
+    {
+        var inputs = new List<NativeMethods.INPUT>();
+
+        foreach (var modifier in gesture.Modifiers)
+        {
+            inputs.Add(CreateKeyInput(modifier, 0));
+        }
+
+        inputs.Add(CreateKeyInput(gesture.Key, 0));
+        inputs.Add(CreateKeyInput(gesture.Key, NativeMethods.KEYEVENTF_KEYUP));
+
+        for (int i = gesture.Modifiers.Count - 1; i >= 0; i--)
+        {
+            inputs.Add(CreateKeyInput(gesture.Modifiers[i], NativeMethods.KEYEVENTF_KEYUP));
+        }
+
+        return inputs.ToArray();
+    }
+
+    private List<ushort> GetPressedModifiers()
+    {
+        var pressed = new List<ushort>();
+        foreach (var modifier in PhysicalModifiers)
+        {
+            if ((NativeMethods.GetAsyncKeyState(modifier) & 0x8000) != 0)
+            {
+                pressed.Add(modifier);
+            }
+        }
+
+        return pressed;
+    }
+
+    private bool SendInputBatch(IReadOnlyList<NativeMethods.INPUT> batch, string name)
+    {
+        if (batch.Count == 0)
+        {
+            return true;
+        }
+
+        var sent = NativeMethods.SendInput((uint)batch.Count, batch.ToArray(), Marshal.SizeOf<NativeMethods.INPUT>());
+        if (sent == batch.Count)
+        {
+            return true;
+        }
+
+        _logService.Warn($"SendInput failed for {name}. Sent={sent}/{batch.Count}.");
+        return false;
+    }
+
+    private void RestoreStillPressedModifiers(IReadOnlyList<ushort> previouslyPressedModifiers, string name)
+    {
+        if (previouslyPressedModifiers.Count == 0)
+        {
+            return;
+        }
+
+        Thread.Sleep(30);
+
+        var restoreInputs = new List<NativeMethods.INPUT>();
+        for (int i = previouslyPressedModifiers.Count - 1; i >= 0; i--)
+        {
+            var modifier = previouslyPressedModifiers[i];
+            if ((NativeMethods.GetAsyncKeyState(modifier) & 0x8000) != 0)
+            {
+                restoreInputs.Add(CreateKeyInput(modifier, 0));
+            }
+        }
+
+        if (restoreInputs.Count == 0)
+        {
+            return;
+        }
+
+        var restored = NativeMethods.SendInput((uint)restoreInputs.Count, restoreInputs.ToArray(), Marshal.SizeOf<NativeMethods.INPUT>());
+        if (restored != restoreInputs.Count)
+        {
+            _logService.Warn($"SendInput partially restored modifiers for {name}. Sent={restored}/{restoreInputs.Count}.");
         }
     }
 
@@ -259,5 +291,4 @@ public sealed class KeySender
     {
         return (NativeMethods.GetAsyncKeyState(virtualKey) & 0x8000) != 0;
     }
-
 }

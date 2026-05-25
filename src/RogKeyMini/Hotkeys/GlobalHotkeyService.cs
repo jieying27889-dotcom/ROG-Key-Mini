@@ -1,5 +1,6 @@
 using RogKeyMini.Config;
 using RogKeyMini.Interop;
+using RogKeyMini.Input;
 using RogKeyMini.Logging;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
@@ -22,7 +23,7 @@ public sealed class GlobalHotkeyService : IDisposable
 
     public event EventHandler<HotkeyPressedEventArgs>? HotkeyPressed;
 
-    public void RegisterDefaults(Window window, HotkeysConfig config)
+    public void RegisterConfiguredHotkeys(Window window, HotkeysConfig hotkeysConfig, IReadOnlyList<PanelButtonConfig> buttons)
     {
         void RegisterAll()
         {
@@ -35,13 +36,13 @@ public sealed class GlobalHotkeyService : IDisposable
             _source = HwndSource.FromHwnd(_windowHandle);
             _source?.AddHook(WndProc);
 
-            Register(1, config.SendF2, HotkeyAction.SendF2);
-            Register(2, config.SendF7, HotkeyAction.SendF7);
-            Register(3, config.SendMinus, HotkeyAction.SendMinus);
-            Register(7, config.SendUnderscore, HotkeyAction.SendUnderscore);
-            Register(4, config.KeyboardBacklightDown, HotkeyAction.KeyboardBacklightDown);
-            Register(5, config.ScreenBrightnessDown, HotkeyAction.ScreenBrightnessDown);
-            Register(6, config.ToggleWindow, HotkeyAction.ToggleWindow);
+            Register(1, hotkeysConfig.ToggleWindow, HotkeyAction.ToggleWindow);
+
+            int nextId = 100;
+            foreach (var button in buttons)
+            {
+                Register(nextId++, button.TriggerHotkey ?? string.Empty, HotkeyAction.PanelButton, button);
+            }
         }
 
         var handle = new WindowInteropHelper(window).Handle;
@@ -65,7 +66,7 @@ public sealed class GlobalHotkeyService : IDisposable
         _actions.Clear();
     }
 
-    private void Register(int id, string gesture, HotkeyAction action)
+    private void Register(int id, string gesture, HotkeyAction action, PanelButtonConfig? buttonConfig = null)
     {
         if (_windowHandle == IntPtr.Zero)
         {
@@ -78,7 +79,7 @@ public sealed class GlobalHotkeyService : IDisposable
             return;
         }
 
-        if (!TryParseGesture(gesture, out var modifiers, out var key))
+        if (!KeyGestureParser.TryParseForHotkey(gesture, out var modifiers, out var key))
         {
             _logService.Warn($"Hotkey gesture parse failed: {gesture}.");
             return;
@@ -92,7 +93,7 @@ public sealed class GlobalHotkeyService : IDisposable
             return;
         }
 
-        _actions[id] = new RegisteredHotkey(action, gesture, modifiers, key);
+        _actions[id] = new RegisteredHotkey(action, gesture, modifiers, key, buttonConfig);
         _logService.Info($"Registered hotkey {gesture}.");
     }
 
@@ -106,7 +107,7 @@ public sealed class GlobalHotkeyService : IDisposable
                 _logService.Info($"Received WM_HOTKEY message for ID={id}, Action={hotkey.Action}, Gesture={hotkey.Gesture}.");
                 HotkeyPressed?.Invoke(
                     this,
-                    new HotkeyPressedEventArgs(hotkey.Action, hotkey.Gesture, hotkey.Modifiers, hotkey.Key));
+                    new HotkeyPressedEventArgs(hotkey.Action, hotkey.Gesture, hotkey.Modifiers, hotkey.Key, hotkey.ButtonConfig));
                 handled = true;
             }
             else
@@ -117,121 +118,23 @@ public sealed class GlobalHotkeyService : IDisposable
 
         return IntPtr.Zero;
     }
-
-    private static bool TryParseGesture(string gesture, out uint modifiers, out uint key)
-    {
-        modifiers = 0;
-        key = 0;
-        var keyAssigned = false;
-
-        var parts = gesture.Split('+', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (var part in parts)
-        {
-            switch (part.ToUpperInvariant())
-            {
-                case "CTRL":
-                    modifiers |= NativeMethods.MOD_CONTROL;
-                    break;
-                case "ALT":
-                    modifiers |= NativeMethods.MOD_ALT;
-                    break;
-                case "SHIFT":
-                    modifiers |= NativeMethods.MOD_SHIFT;
-                    break;
-                case "WIN":
-                    modifiers |= NativeMethods.MOD_WIN;
-                    break;
-                default:
-                    if (keyAssigned || !TryParseVirtualKey(part, out key))
-                    {
-                        return false;
-                    }
-
-                    keyAssigned = true;
-                    break;
-            }
-        }
-
-        return key != 0;
-    }
-
-    private static bool TryParseVirtualKey(string token, out uint key)
-    {
-        key = 0;
-
-        var normalized = token.Trim().ToUpperInvariant();
-        if (normalized.Length == 1)
-        {
-            var c = normalized[0];
-
-            if (c is >= 'A' and <= 'Z')
-            {
-                key = c;
-                return true;
-            }
-
-            if (c is >= '0' and <= '9')
-            {
-                key = c;
-                return true;
-            }
-        }
-
-        if (normalized == "SPACE")
-        {
-            key = 0x20;
-            return true;
-        }
-
-        if (normalized is "MINUS" or "OEM_MINUS" or "OEMMINUS")
-        {
-            key = 0xBD;
-            return true;
-        }
-
-        if (normalized is "[" or "OEM_4" or "OEM4")
-        {
-            key = 0xDB;
-            return true;
-        }
-
-        if (normalized is "]" or "OEM_6" or "OEM6")
-        {
-            key = 0xDD;
-            return true;
-        }
-
-        if (normalized.StartsWith('F')
-            && int.TryParse(normalized[1..], out var functionKeyIndex)
-            && functionKeyIndex is >= 1 and <= 24)
-        {
-            key = (uint)(0x70 + functionKeyIndex - 1);
-            return true;
-        }
-
-        return false;
-    }
 }
 
 public enum HotkeyAction
 {
-    SendF2,
-    SendF7,
-    SendMinus,
-    SendUnderscore,
-    KeyboardBacklightDown,
-    ScreenBrightnessDown,
+    PanelButton,
     ToggleWindow
 }
 
 public sealed class HotkeyPressedEventArgs : EventArgs
 {
-    public HotkeyPressedEventArgs(HotkeyAction action, string gesture, uint modifiers, uint key)
+    public HotkeyPressedEventArgs(HotkeyAction action, string gesture, uint modifiers, uint key, PanelButtonConfig? buttonConfig)
     {
         Action = action;
         Gesture = gesture;
         Modifiers = modifiers;
         Key = key;
+        ButtonConfig = buttonConfig;
     }
 
     public HotkeyAction Action { get; }
@@ -241,6 +144,8 @@ public sealed class HotkeyPressedEventArgs : EventArgs
     public uint Modifiers { get; }
 
     public uint Key { get; }
+
+    public PanelButtonConfig? ButtonConfig { get; }
 }
 
-internal sealed record RegisteredHotkey(HotkeyAction Action, string Gesture, uint Modifiers, uint Key);
+internal sealed record RegisteredHotkey(HotkeyAction Action, string Gesture, uint Modifiers, uint Key, PanelButtonConfig? ButtonConfig);

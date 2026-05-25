@@ -20,6 +20,7 @@ public partial class App : System.Windows.Application
     private GlobalHotkeyService? _hotkeyService;
     private AsusAcpiService? _asusAcpiService;
     private AltKeyMonitorService? _altKeyMonitor;
+    private SettingsWindow? _settingsWindow;
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -49,12 +50,12 @@ public partial class App : System.Windows.Application
             screenBrightnessService,
             keyboardBacklightService);
 
-        _hotkeyService = new GlobalHotkeyService(_logService);
-        _hotkeyService.HotkeyPressed += OnHotkeyPressed;
-        _hotkeyService.RegisterDefaults(_mainWindow, _config.Hotkeys);
+        InitializeHotkeyService();
 
         _trayService = new TrayService(_logService, _configService);
         _trayService.ShowHideRequested += (_, _) => _mainWindow.ToggleVisibility();
+        _trayService.ResetWindowPositionRequested += (_, _) => ResetMainWindowPosition();
+        _trayService.SettingsRequested += (_, _) => OpenSettingsWindow();
         _trayService.ExitRequested += (_, _) => ExitApplication();
         _trayService.Initialize();
 
@@ -92,23 +93,11 @@ public partial class App : System.Windows.Application
 
         switch (e.Action)
         {
-            case HotkeyAction.SendF2:
-                _mainWindow.SendF2();
-                break;
-            case HotkeyAction.SendF7:
-                _mainWindow.SendF7();
-                break;
-            case HotkeyAction.SendMinus:
-                _mainWindow.SendMinus((ushort)e.Key);
-                break;
-            case HotkeyAction.SendUnderscore:
-                _mainWindow.SendUnderscore((ushort)e.Key);
-                break;
-            case HotkeyAction.KeyboardBacklightDown:
-                _mainWindow.DecreaseKeyboardBacklight();
-                break;
-            case HotkeyAction.ScreenBrightnessDown:
-                _mainWindow.DecreaseScreenBrightness();
+            case HotkeyAction.PanelButton:
+                if (e.ButtonConfig is not null)
+                {
+                    _mainWindow.ExecuteConfiguredButton(e.ButtonConfig);
+                }
                 break;
             case HotkeyAction.ToggleWindow:
                 _mainWindow.ToggleVisibility();
@@ -118,6 +107,8 @@ public partial class App : System.Windows.Application
 
     private void ExitApplication()
     {
+        _settingsWindow?.Close();
+
         if (_mainWindow is not null)
         {
             _mainWindow.AllowClose = true;
@@ -154,5 +145,65 @@ public partial class App : System.Windows.Application
     {
         _logService?.Error("TaskScheduler unobserved task exception.", e.Exception);
         e.SetObserved();
+    }
+
+    private void OpenSettingsWindow()
+    {
+        if (_mainWindow is null || _config is null || _configService is null || _logService is null)
+        {
+            return;
+        }
+
+        if (_settingsWindow is not null)
+        {
+            _settingsWindow.Activate();
+            _settingsWindow.Focus();
+            return;
+        }
+
+        _settingsWindow = new SettingsWindow(
+            _config,
+            _configService,
+            _logService,
+            applyChanges: () =>
+            {
+                _mainWindow.ReloadFromConfig();
+                ReloadHotkeys();
+            });
+
+        _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+        _settingsWindow.Show();
+        _settingsWindow.Activate();
+    }
+
+    private void InitializeHotkeyService()
+    {
+        if (_mainWindow is null || _config is null || _logService is null)
+        {
+            return;
+        }
+
+        _hotkeyService = new GlobalHotkeyService(_logService);
+        _hotkeyService.HotkeyPressed += OnHotkeyPressed;
+        _hotkeyService.RegisterConfiguredHotkeys(_mainWindow, _config.Hotkeys, _config.Panel.Buttons);
+    }
+
+    private void ReloadHotkeys()
+    {
+        _hotkeyService?.Dispose();
+        InitializeHotkeyService();
+        _logService?.Info("已重新加载全局快捷键配置。");
+    }
+
+    private void ResetMainWindowPosition()
+    {
+        if (_mainWindow is null || _config is null || _configService is null || _logService is null)
+        {
+            return;
+        }
+
+        _mainWindow.ResetToPrimaryScreenCenter();
+        _configService.SaveRuntimeState(_config, _logService);
+        _logService.Info("已通过托盘菜单重置窗口位置到屏幕中央。");
     }
 }

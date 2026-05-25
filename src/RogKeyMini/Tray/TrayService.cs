@@ -23,6 +23,10 @@ public sealed class TrayService : IDisposable
 
     public event EventHandler? ShowHideRequested;
 
+    public event EventHandler? SettingsRequested;
+
+    public event EventHandler? ResetWindowPositionRequested;
+
     public event EventHandler? ExitRequested;
 
     public void Initialize()
@@ -40,7 +44,9 @@ public sealed class TrayService : IDisposable
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("显示 / 隐藏悬浮窗", null, (_, _) => ShowHideRequested?.Invoke(this, EventArgs.Empty));
-        menu.Items.Add("设置", null, (_, _) => OpenConfigFile());
+        menu.Items.Add("重置窗口位置到屏幕中央", null, (_, _) => ResetWindowPositionRequested?.Invoke(this, EventArgs.Empty));
+        menu.Items.Add("设置面板", null, (_, _) => SettingsRequested?.Invoke(this, EventArgs.Empty));
+        menu.Items.Add("打开配置文件", null, (_, _) => OpenConfigFile());
         menu.Items.Add("查看日志", null, (_, _) => OpenLogFile());
         menu.Items.Add(autoStartItem);
         menu.Items.Add("退出", null, (_, _) => ExitRequested?.Invoke(this, EventArgs.Empty));

@@ -48,8 +48,9 @@ public sealed class ConfigService
             if (normalized)
             {
                 Save(result, logService);
-                logService.Warn("检测到配置字段不完整（如缺少新增的Alt键监控属性或中文说明），已将补全后的配置保存回 config.json 文件。");
+                logService.Warn("检测到配置字段缺失或越界，已自动补全并保存回 config.json。");
             }
+
             return result;
         }
         catch (Exception ex)
@@ -80,6 +81,7 @@ public sealed class ConfigService
             var diskConfig = Load(logService);
             diskConfig.Window.Left = runtimeConfig.Window.Left;
             diskConfig.Window.Top = runtimeConfig.Window.Top;
+            diskConfig.Window.AutoHideEnabled = false;
             diskConfig.KeyboardBacklight.LastKnownLevel = runtimeConfig.KeyboardBacklight.LastKnownLevel;
             Save(diskConfig, logService);
         }
@@ -87,6 +89,18 @@ public sealed class ConfigService
         {
             logService.Error("Failed to save runtime state.", ex);
         }
+    }
+
+    public AppConfig Clone(AppConfig config)
+    {
+        var json = JsonSerializer.Serialize(config, JsonOptions);
+        var clone = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions);
+        if (clone is null)
+        {
+            throw new InvalidOperationException("Failed to clone app config.");
+        }
+
+        return clone;
     }
 
     private AppConfig LoadDefaultConfig(LogService logService)
@@ -126,7 +140,7 @@ public sealed class ConfigService
             config.Window = new WindowConfig();
             normalized = true;
         }
-        if (string.IsNullOrWhiteSpace(config.Window.说明))
+        else if (string.IsNullOrWhiteSpace(config.Window.说明))
         {
             config.Window.说明 = new WindowConfig().说明;
             normalized = true;
@@ -137,9 +151,20 @@ public sealed class ConfigService
             config.Hotkeys = new HotkeysConfig();
             normalized = true;
         }
-        if (string.IsNullOrWhiteSpace(config.Hotkeys.说明))
+        else if (string.IsNullOrWhiteSpace(config.Hotkeys.说明))
         {
             config.Hotkeys.说明 = new HotkeysConfig().说明;
+            normalized = true;
+        }
+
+        if (config.Panel is null)
+        {
+            config.Panel = new PanelConfig();
+            normalized = true;
+        }
+        else if (string.IsNullOrWhiteSpace(config.Panel.说明))
+        {
+            config.Panel.说明 = new PanelConfig().说明;
             normalized = true;
         }
 
@@ -148,7 +173,7 @@ public sealed class ConfigService
             config.Brightness = new BrightnessConfig();
             normalized = true;
         }
-        if (string.IsNullOrWhiteSpace(config.Brightness.说明))
+        else if (string.IsNullOrWhiteSpace(config.Brightness.说明))
         {
             config.Brightness.说明 = new BrightnessConfig().说明;
             normalized = true;
@@ -159,9 +184,20 @@ public sealed class ConfigService
             config.KeyboardBacklight = new KeyboardBacklightConfig();
             normalized = true;
         }
-        if (string.IsNullOrWhiteSpace(config.KeyboardBacklight.说明))
+        else if (string.IsNullOrWhiteSpace(config.KeyboardBacklight.说明))
         {
             config.KeyboardBacklight.说明 = new KeyboardBacklightConfig().说明;
+            normalized = true;
+        }
+
+        if (config.AltMonitor is null)
+        {
+            config.AltMonitor = new AltMonitorConfig();
+            normalized = true;
+        }
+        else if (string.IsNullOrWhiteSpace(config.AltMonitor.说明))
+        {
+            config.AltMonitor.说明 = new AltMonitorConfig().说明;
             normalized = true;
         }
 
@@ -176,63 +212,109 @@ public sealed class ConfigService
             config.CpuPower = new CpuPowerConfig();
             normalized = true;
         }
- 
-        if (config.AltMonitor is null)
+
+        if (config.Panel.Buttons is null || config.Panel.Buttons.Count == 0)
         {
-            config.AltMonitor = new AltMonitorConfig();
+            config.Panel.Buttons = PanelButtonConfig.CreateDefaults();
             normalized = true;
         }
-        if (string.IsNullOrWhiteSpace(config.AltMonitor.说明))
+        else
         {
-            config.AltMonitor.说明 = new AltMonitorConfig().说明;
-            normalized = true;
+            for (int i = 0; i < config.Panel.Buttons.Count; i++)
+            {
+                var button = config.Panel.Buttons[i] ?? new PanelButtonConfig();
+                var fallback = new PanelButtonConfig();
+
+                if (string.IsNullOrWhiteSpace(button.Label))
+                {
+                    button.Label = fallback.Label;
+                    normalized = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(button.Action))
+                {
+                    button.Action = fallback.Action;
+                    normalized = true;
+                }
+
+                if (string.Equals(button.Action, "SendKey", StringComparison.OrdinalIgnoreCase)
+                    && string.IsNullOrWhiteSpace(button.Gesture))
+                {
+                    button.Gesture = fallback.Gesture;
+                    normalized = true;
+                }
+
+                if (!string.Equals(button.Action, "SendKey", StringComparison.OrdinalIgnoreCase)
+                    && !string.IsNullOrWhiteSpace(button.Gesture)
+                    && IsBuiltInAction(button.Action))
+                {
+                    button.Gesture = null;
+                    normalized = true;
+                }
+
+                if (string.IsNullOrWhiteSpace(button.TriggerHotkey))
+                {
+                    var migratedHotkey = GetLegacyTriggerHotkey(button, config.Hotkeys);
+                    if (!string.IsNullOrWhiteSpace(migratedHotkey))
+                    {
+                        button.TriggerHotkey = migratedHotkey;
+                        normalized = true;
+                    }
+                }
+
+                config.Panel.Buttons[i] = button;
+            }
         }
 
-        if (config.Hotkeys.SendF2 is null)
+        if (string.IsNullOrWhiteSpace(config.Hotkeys.SendF2))
         {
             config.Hotkeys.SendF2 = new HotkeysConfig().SendF2;
             normalized = true;
         }
-
-        if (config.Hotkeys.SendF7 is null)
+        if (string.IsNullOrWhiteSpace(config.Hotkeys.SendF7))
         {
             config.Hotkeys.SendF7 = new HotkeysConfig().SendF7;
             normalized = true;
         }
-
-        if (config.Hotkeys.SendMinus is null)
+        if (string.IsNullOrWhiteSpace(config.Hotkeys.SendMinus))
         {
             config.Hotkeys.SendMinus = new HotkeysConfig().SendMinus;
             normalized = true;
         }
-
-        if (config.Hotkeys.SendUnderscore is null)
+        if (string.IsNullOrWhiteSpace(config.Hotkeys.SendUnderscore))
         {
             config.Hotkeys.SendUnderscore = new HotkeysConfig().SendUnderscore;
             normalized = true;
         }
-
-        if (config.Hotkeys.KeyboardBacklightDown is null)
+        if (string.IsNullOrWhiteSpace(config.Hotkeys.KeyboardBacklightDown))
         {
             config.Hotkeys.KeyboardBacklightDown = new HotkeysConfig().KeyboardBacklightDown;
             normalized = true;
         }
-
-        if (config.Hotkeys.ScreenBrightnessDown is null)
+        if (string.IsNullOrWhiteSpace(config.Hotkeys.ScreenBrightnessDown))
         {
             config.Hotkeys.ScreenBrightnessDown = new HotkeysConfig().ScreenBrightnessDown;
             normalized = true;
         }
-
-        if (config.Hotkeys.ToggleWindow is null)
+        if (string.IsNullOrWhiteSpace(config.Hotkeys.ToggleWindow))
         {
             config.Hotkeys.ToggleWindow = new HotkeysConfig().ToggleWindow;
             normalized = true;
         }
-
         if (string.IsNullOrWhiteSpace(config.CpuPower.BoostModeAc))
         {
             config.CpuPower.BoostModeAc = new CpuPowerConfig().BoostModeAc;
+            normalized = true;
+        }
+        if (string.IsNullOrWhiteSpace(config.Window.DockEdge))
+        {
+            config.Window.DockEdge = new WindowConfig().DockEdge;
+            normalized = true;
+        }
+
+        if (config.Window.AutoHideEnabled)
+        {
+            config.Window.AutoHideEnabled = false;
             normalized = true;
         }
 
@@ -240,6 +322,27 @@ public sealed class ConfigService
         if (config.Window.Opacity != safeOpacity)
         {
             config.Window.Opacity = safeOpacity;
+            normalized = true;
+        }
+
+        var safeRevealSize = Math.Clamp(config.Window.RevealSize, 12, 40);
+        if (Math.Abs(config.Window.RevealSize - safeRevealSize) > double.Epsilon)
+        {
+            config.Window.RevealSize = safeRevealSize;
+            normalized = true;
+        }
+
+        var safeHandleOpacity = Math.Clamp(config.Window.HandleOpacity, 0.1, 1.0);
+        if (Math.Abs(config.Window.HandleOpacity - safeHandleOpacity) > double.Epsilon)
+        {
+            config.Window.HandleOpacity = safeHandleOpacity;
+            normalized = true;
+        }
+
+        var safeAutoHideDelayMs = Math.Clamp(config.Window.AutoHideDelayMs, 0, 5000);
+        if (config.Window.AutoHideDelayMs != safeAutoHideDelayMs)
+        {
+            config.Window.AutoHideDelayMs = safeAutoHideDelayMs;
             normalized = true;
         }
 
@@ -278,11 +381,81 @@ public sealed class ConfigService
             normalized = true;
         }
 
+        var safeUpdateIntervalMs = Math.Clamp(config.Fan.UpdateIntervalMs, 250, 10000);
+        if (config.Fan.UpdateIntervalMs != safeUpdateIntervalMs)
+        {
+            config.Fan.UpdateIntervalMs = safeUpdateIntervalMs;
+            normalized = true;
+        }
+
+        var safeTemperatureAverageSeconds = Math.Clamp(config.Fan.TemperatureAverageSeconds, 1, 60);
+        if (config.Fan.TemperatureAverageSeconds != safeTemperatureAverageSeconds)
+        {
+            config.Fan.TemperatureAverageSeconds = safeTemperatureAverageSeconds;
+            normalized = true;
+        }
+
+        var safeStuckThresholdMs = Math.Clamp(config.AltMonitor.StuckThresholdMs, 200, 10000);
+        if (config.AltMonitor.StuckThresholdMs != safeStuckThresholdMs)
+        {
+            config.AltMonitor.StuckThresholdMs = safeStuckThresholdMs;
+            normalized = true;
+        }
+
+        if (!IsValidDockEdge(config.Window.DockEdge))
+        {
+            config.Window.DockEdge = new WindowConfig().DockEdge;
+            normalized = true;
+        }
+
         if (normalized)
         {
             logService.Warn("Config was missing required values and has been normalized in memory.");
         }
 
         return config;
+    }
+    private static bool IsValidDockEdge(string? dockEdge)
+    {
+        return dockEdge is "Left" or "Right";
+    }
+
+    private static bool IsBuiltInAction(string? action)
+    {
+        return action?.Trim() switch
+        {
+            "KeyboardBacklightDown" => true,
+            "ScreenBrightnessDown" => true,
+            "LaunchOsk" => true,
+            "ToggleAutoRelease" => true,
+            _ => false
+        };
+    }
+
+    private static string? GetLegacyTriggerHotkey(PanelButtonConfig button, HotkeysConfig hotkeys)
+    {
+        if (string.Equals(button.Action, "KeyboardBacklightDown", StringComparison.OrdinalIgnoreCase))
+        {
+            return hotkeys.KeyboardBacklightDown;
+        }
+
+        if (string.Equals(button.Action, "ScreenBrightnessDown", StringComparison.OrdinalIgnoreCase))
+        {
+            return hotkeys.ScreenBrightnessDown;
+        }
+
+        if (!string.Equals(button.Action, "SendKey", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return button.Gesture?.Trim() switch
+        {
+            "F2" => hotkeys.SendF2,
+            "F7" => hotkeys.SendF7,
+            "-" => hotkeys.SendMinus,
+            "_" => hotkeys.SendUnderscore,
+            _ => null
+        };
     }
 }

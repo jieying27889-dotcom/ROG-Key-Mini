@@ -1,0 +1,134 @@
+<Window
+    x:Class="RogKeyMini.SettingsWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="RogKeyMini 设置"
+    Width="980"
+    Height="780"
+    WindowStartupLocation="CenterScreen"
+    ResizeMode="CanResize"
+    MinWidth="900"
+    MinHeight="680"
+    Topmost="False"
+    ShowInTaskbar="True">
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,12">
+            <TextBlock FontSize="22" FontWeight="Bold" Text="设置面板" />
+            <TextBlock Margin="0,6,0,0" Foreground="#666" Text="在这里图形化管理自定义按钮和窗口快捷键，不需要手改配置文件。" />
+        </StackPanel>
+
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2.3*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0" Padding="14" BorderBrush="#DDD" BorderThickness="1" CornerRadius="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel>
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="按钮列表" />
+                        <TextBlock Margin="0,6,0,0" Foreground="#666" TextWrapping="Wrap"
+                                   Text="这里直接管理每个按钮的显示文字、动作类型、模拟键位和触发组合键。新增按钮默认就是 SendKey。" />
+                    </StackPanel>
+
+                    <DataGrid x:Name="ButtonsGrid"
+                              Grid.Row="1"
+                              Margin="0,12,0,12"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              HeadersVisibility="Column"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Width="130" Header="按钮文字" Binding="{Binding Label, UpdateSourceTrigger=PropertyChanged}" />
+                            <DataGridTemplateColumn Width="170" Header="动作类型">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <TextBlock VerticalAlignment="Center" Text="{Binding Action}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                                <DataGridTemplateColumn.CellEditingTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding DataContext.ActionOptions, RelativeSource={RelativeSource AncestorType=Window}}"
+                                                  SelectedItem="{Binding Action, UpdateSourceTrigger=PropertyChanged}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellEditingTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTextColumn Width="220" Header="模拟键位" Binding="{Binding Gesture, UpdateSourceTrigger=PropertyChanged}" />
+                            <DataGridTextColumn Width="220" Header="触发组合键" Binding="{Binding TriggerHotkey, UpdateSourceTrigger=PropertyChanged}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+
+                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                        <Button Width="92" Height="34" Margin="0,0,8,0" Click="AddButton_OnClick">新增按钮</Button>
+                        <Button Width="92" Height="34" Margin="0,0,8,0" Click="RemoveButton_OnClick">删除按钮</Button>
+                        <Button Width="92" Height="34" Margin="0,0,8,0" Click="MoveUpButton_OnClick">上移</Button>
+                        <Button Width="92" Height="34" Margin="0,0,8,0" Click="MoveDownButton_OnClick">下移</Button>
+                        <Button Width="120" Height="34" Click="ResetButtons_OnClick">恢复默认按钮</Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Column="2">
+                <Border Padding="14" BorderBrush="#DDD" BorderThickness="1" CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="窗口行为" />
+                        <TextBlock Margin="0,12,0,0" Foreground="#666" TextWrapping="Wrap"
+                                   Text="自动靠边隐藏已取消。悬浮窗会始终保持普通可拖动状态，只保留托盘隐藏与显示。"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,16,0,0" Padding="14" BorderBrush="#DDD" BorderThickness="1" CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="窗口快捷键" />
+                        <TextBlock Margin="0,10,0,0" Foreground="#666" TextWrapping="Wrap"
+                                   Text="按钮自己的触发组合键请直接在左侧表格填写。这里单独保留一个悬浮窗显示/隐藏快捷键。" />
+
+                        <TextBlock Margin="0,12,0,4" Text="显示/隐藏悬浮窗" />
+                        <TextBox x:Name="HotkeyToggleWindowTextBox" />
+                    </StackPanel>
+                </Border>
+
+                <Border Margin="0,16,0,0" Padding="14" BorderBrush="#DDD" BorderThickness="1" CornerRadius="10">
+                    <StackPanel>
+                        <TextBlock FontSize="16" FontWeight="SemiBold" Text="填写提示" />
+                        <TextBlock Margin="0,12,0,0" TextWrapping="Wrap">
+                            1. `SendKey` 用来模拟单键或组合键，例如 `Esc`、`Ctrl+Shift+S`、`Alt+Tab`。
+                        </TextBlock>
+                        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap">
+                            2. `触发组合键` 填的是按下什么组合键来触发这一行按钮，例如 `Ctrl+2`、`Alt+7`。
+                        </TextBlock>
+                        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap">
+                            3. 非 `SendKey` 动作可以不填 `模拟键位`。
+                        </TextBlock>
+                        <TextBlock Margin="0,8,0,0" TextWrapping="Wrap">
+                            4. 主界面固定每排 `5` 个按钮，超过后会自动换到下一排。
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <StackPanel Grid.Row="2" Margin="0,16,0,0" Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Width="120" Height="36" Margin="0,0,10,0" Click="OpenConfigFile_OnClick">打开配置文件</Button>
+            <Button Width="100" Height="36" Margin="0,0,10,0" Click="Cancel_OnClick">取消</Button>
+            <Button Width="120" Height="36" Click="Save_OnClick">保存并应用</Button>
+        </StackPanel>
+    </Grid>
+    </ScrollViewer>
+</Window>

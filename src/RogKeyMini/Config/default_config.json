@@ -1,13 +1,18 @@
 {
   "Window": {
-    "说明": "悬浮窗设置：Left(左边距), Top(上边距), Opacity(不透明度 0.2-1.0), Topmost(是否置顶)",
+    "说明": "悬浮窗设置：Left(左边距), Top(上边距), Opacity(不透明度0.2-1.0), Topmost(是否置顶)。AutoHideEnabled、DockEdge、RevealSize、HandleOpacity、AutoHideDelayMs 为历史兼容字段，当前版本已不再使用自动靠边隐藏。",
     "Left": 1200,
     "Top": 300,
     "Opacity": 0.95,
-    "Topmost": true
+    "Topmost": true,
+    "AutoHideEnabled": false,
+    "DockEdge": "Right",
+    "RevealSize": 14,
+    "HandleOpacity": 0.78,
+    "AutoHideDelayMs": 500
   },
   "Hotkeys": {
-    "说明": "全局快捷键设置：支持注册如 Ctrl+2, Alt+7 等，用于模拟按键或调节硬件",
+    "说明": "全局快捷键设置：支持注册如 Ctrl+2、Alt+7 等组合键，用于触发固定功能。",
     "SendF2": "Ctrl+2",
     "SendF7": "Alt+7",
     "SendMinus": "Alt+9",
@@ -16,13 +21,62 @@
     "ScreenBrightnessDown": "Alt+]",
     "ToggleWindow": "Ctrl+Shift+1"
   },
+  "Panel": {
+    "说明": "按钮面板设置：Buttons 为界面按钮列表。每个按钮支持 Label(显示文字), Action(动作类型), Gesture(要模拟的键位或组合键), TriggerHotkey(触发该按钮的全局组合键)。固定为每排5个按钮，数量增加时自动换到下一排。",
+    "Buttons": [
+      {
+        "Label": "F2",
+        "Action": "SendKey",
+        "Gesture": "F2",
+        "TriggerHotkey": "Ctrl+2"
+      },
+      {
+        "Label": "F7",
+        "Action": "SendKey",
+        "Gesture": "F7",
+        "TriggerHotkey": "Alt+7"
+      },
+      {
+        "Label": "-",
+        "Action": "SendKey",
+        "Gesture": "-",
+        "TriggerHotkey": "Alt+9"
+      },
+      {
+        "Label": "_",
+        "Action": "SendKey",
+        "Gesture": "_",
+        "TriggerHotkey": "Alt+0"
+      },
+      {
+        "Label": "背光-",
+        "Action": "KeyboardBacklightDown",
+        "TriggerHotkey": "Alt+["
+      },
+      {
+        "Label": "亮度-",
+        "Action": "ScreenBrightnessDown",
+        "TriggerHotkey": "Alt+]"
+      },
+      {
+        "Label": "OSK",
+        "Action": "LaunchOsk",
+        "TriggerHotkey": ""
+      },
+      {
+        "Label": "防粘Alt",
+        "Action": "ToggleAutoRelease",
+        "TriggerHotkey": ""
+      }
+    ]
+  },
   "Brightness": {
-    "说明": "屏幕亮度调节：ScreenStep(每次减少的百分比), ScreenMin(最低亮度限制)",
+    "说明": "屏幕亮度调节：ScreenStep(每次减少的百分比), ScreenMin(最低亮度限制)。",
     "ScreenStep": 10,
     "ScreenMin": 0
   },
   "KeyboardBacklight": {
-    "说明": "键盘背光设置：LastKnownLevel(当前背光亮度级), MaxLevel(最大亮度级，通常为3)",
+    "说明": "键盘背光设置：LastKnownLevel(当前背光亮度级), MaxLevel(最大亮度级，通常为3)。",
     "LastKnownLevel": 3,
     "MaxLevel": 3
   },
@@ -37,7 +91,7 @@
     "BoostModeAc": "Disabled"
   },
   "AltMonitor": {
-    "说明": "Alt键粘滞监控：MonitorLeftAlt/MonitorRightAlt(是否监控左/右Alt), StuckThresholdMs(判定卡住的长按时间毫秒), AutoReleaseEnabled(是否自动释放), NotificationsEnabled(是否启用提示)",
+    "说明": "Alt 键粘连监控：MonitorLeftAlt/MonitorRightAlt(是否监控左右Alt), StuckThresholdMs(判定卡住的长按时长毫秒), AutoReleaseEnabled(是否自动释放), NotificationsEnabled(是否启用提示)。",
     "MonitorLeftAlt": true,
     "MonitorRightAlt": true,
     "StuckThresholdMs": 2000,
