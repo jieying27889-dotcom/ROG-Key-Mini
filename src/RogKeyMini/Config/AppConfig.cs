@@ -31,7 +31,7 @@ public sealed class WindowConfig
 
     public bool Topmost { get; set; } = true;
 
-    public bool AutoHideEnabled { get; set; } = true;
+    public bool AutoHideEnabled { get; set; } = false;
 
     public string DockEdge { get; set; } = "Right";
 

@@ -312,12 +312,6 @@ public sealed class ConfigService
             normalized = true;
         }
 
-        if (config.Window.AutoHideEnabled)
-        {
-            config.Window.AutoHideEnabled = false;
-            normalized = true;
-        }
-
         var safeOpacity = Math.Clamp(config.Window.Opacity, 0.2, 1.0);
         if (config.Window.Opacity != safeOpacity)
         {

@@ -27,7 +27,12 @@ public sealed class KeySender
         _logService = logService;
     }
 
-    public bool IsSending { get; private set; }
+    private volatile bool _isSending;
+    public bool IsSending
+    {
+        get => _isSending;
+        private set => _isSending = value;
+    }
 
     public void SendF2() => SendVirtualKey(0x71, "F2");
 
@@ -125,6 +130,11 @@ public sealed class KeySender
                     return;
                 }
 
+                if (activeModifiers.Count > 0)
+                {
+                    Thread.Sleep(50);
+                }
+
                 if (!SendInputBatch(coreInputs, name))
                 {
                     return;
@@ -177,6 +187,15 @@ public sealed class KeySender
             {
                 pressed.Add(modifier);
             }
+        }
+
+        // AltGr workaround: 系统可能把右 Alt 当作 Ctrl+Alt (AltGr)。
+        // GetAsyncKeyState 可能只报告 RA=True，但系统内部同时有 Ctrl 活跃。
+        // 必须同时释放 VK_RCONTROL 和 VK_LMENU 才能完全退出 AltGr 状态。
+        if (pressed.Contains((ushort)0xA5))
+        {
+            if (!pressed.Contains((ushort)0xA3)) pressed.Add((ushort)0xA3);
+            if (!pressed.Contains((ushort)0xA4)) pressed.Add((ushort)0xA4);
         }
 
         return pressed;

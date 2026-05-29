@@ -61,24 +61,38 @@ public sealed class ScreenBrightnessService
             using var results = searcher.Get();
 
             ManagementObject? fallback = null;
+            ManagementObject? activeItem = null;
+            var allItems = new List<ManagementObject>();
+
             foreach (ManagementObject item in results)
             {
+                allItems.Add(item);
                 fallback ??= item;
 
                 if (IsActive(item))
                 {
-                    brightness = (byte)item["CurrentBrightness"];
-                    return true;
+                    activeItem = item;
                 }
             }
 
-            if (fallback is null)
+            try
             {
-                return false;
-            }
+                var target = activeItem ?? fallback;
+                if (target is null)
+                {
+                    return false;
+                }
 
-            brightness = (byte)fallback["CurrentBrightness"];
-            return true;
+                brightness = (byte)target["CurrentBrightness"];
+                return true;
+            }
+            finally
+            {
+                foreach (var item in allItems)
+                {
+                    item.Dispose();
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -99,11 +113,19 @@ public sealed class ScreenBrightnessService
             {
                 if (!IsActive(item))
                 {
+                    item.Dispose();
                     continue;
                 }
 
-                item.InvokeMethod("WmiSetBrightness", new object[] { uint.MinValue, brightness });
-                anySucceeded = true;
+                try
+                {
+                    item.InvokeMethod("WmiSetBrightness", new object[] { uint.MinValue, brightness });
+                    anySucceeded = true;
+                }
+                finally
+                {
+                    item.Dispose();
+                }
             }
 
             if (anySucceeded)
@@ -113,8 +135,15 @@ public sealed class ScreenBrightnessService
 
             foreach (ManagementObject item in instances)
             {
-                item.InvokeMethod("WmiSetBrightness", new object[] { uint.MinValue, brightness });
-                anySucceeded = true;
+                try
+                {
+                    item.InvokeMethod("WmiSetBrightness", new object[] { uint.MinValue, brightness });
+                    anySucceeded = true;
+                }
+                finally
+                {
+                    item.Dispose();
+                }
             }
 
             return anySucceeded;

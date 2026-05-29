@@ -146,9 +146,7 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        ApplyWindowPosition(ClampWindowPosition(_windowLeft == 0 && _windowTop == 0
-            ? new WpfPoint(Left, Top)
-            : new WpfPoint(_windowLeft, _windowTop)));
+        ApplyWindowPosition(ClampWindowPosition(new WpfPoint(_config.Window.Left, _config.Window.Top)));
     }
 
     private void BuildButtons()

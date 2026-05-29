@@ -161,14 +161,21 @@ public sealed class AltKeyMonitorService : IDisposable
         if (_cts != null)
         {
             _cts.Cancel();
-            try
+
+            if (_monitorTask is { IsCompleted: false })
             {
-                _monitorTask?.Wait(500);
+                // 不在 UI 线程上直接 Wait，避免与 TrayService.ShowNotification 的同步回调死锁。
+                // 取消令牌后监控循环会在下一个 Task.Delay 退出，任务自行完成。
+                try
+                {
+                    Task.Run(() => _monitorTask.Wait(1000)).Wait(1100);
+                }
+                catch
+                {
+                    // 忽略等待线程结束的异常
+                }
             }
-            catch
-            {
-                // 忽略等待线程结束的异常
-            }
+
             _cts.Dispose();
             _cts = null;
         }

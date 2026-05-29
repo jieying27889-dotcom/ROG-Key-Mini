@@ -4,6 +4,8 @@ using System.IO;
 
 public sealed class LogService
 {
+    private const long MaxLogSizeBytes = 5 * 1024 * 1024;
+
     private readonly string _logPath;
     private readonly object _gate = new();
 
@@ -35,7 +37,28 @@ public sealed class LogService
 
         lock (_gate)
         {
+            RotateIfNeeded();
             File.AppendAllText(_logPath, line);
+        }
+    }
+
+    private void RotateIfNeeded()
+    {
+        try
+        {
+            var fileInfo = new FileInfo(_logPath);
+            if (fileInfo.Exists && fileInfo.Length > MaxLogSizeBytes)
+            {
+                var backupPath = _logPath + ".bak";
+                if (File.Exists(backupPath))
+                {
+                    File.Delete(backupPath);
+                }
+                File.Move(_logPath, backupPath);
+            }
+        }
+        catch
+        {
         }
     }
 }
