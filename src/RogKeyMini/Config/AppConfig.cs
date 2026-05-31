@@ -82,12 +82,13 @@ public sealed class PanelButtonConfig
     {
         return new List<PanelButtonConfig>
         {
-            new() { Label = "F2", Action = "SendKey", Gesture = "F2", TriggerHotkey = "Ctrl+2" },
-            new() { Label = "F7", Action = "SendKey", Gesture = "F7", TriggerHotkey = "Alt+7" },
-            new() { Label = "-", Action = "SendKey", Gesture = "-", TriggerHotkey = "Alt+9" },
-            new() { Label = "_", Action = "SendKey", Gesture = "_", TriggerHotkey = "Alt+0" },
-            new() { Label = "背光-", Action = "KeyboardBacklightDown", TriggerHotkey = "Alt+[" },
-            new() { Label = "亮度-", Action = "ScreenBrightnessDown", TriggerHotkey = "Alt+]" },
+            new() { Label = "F2", Action = "SendKey", Gesture = "F2", TriggerHotkey = "Ctrl+Shift+2" },
+            new() { Label = "F7", Action = "SendKey", Gesture = "F7", TriggerHotkey = "Ctrl+Shift+7" },
+            new() { Label = "-", Action = "SendKey", Gesture = "-", TriggerHotkey = "Ctrl+Shift+9" },
+            new() { Label = "_", Action = "SendKey", Gesture = "_", TriggerHotkey = "Ctrl+Shift+0" },
+            new() { Label = "背光-", Action = "KeyboardBacklightDown", TriggerHotkey = "Ctrl+Shift+[" },
+            new() { Label = "背光+", Action = "KeyboardBacklightUp", TriggerHotkey = "Ctrl+Shift+]" },
+            new() { Label = "亮度-", Action = "ScreenBrightnessDown", TriggerHotkey = "" },
             new() { Label = "OSK", Action = "LaunchOsk", TriggerHotkey = "" },
             new() { Label = "防粘Alt", Action = "ToggleAutoRelease", TriggerHotkey = "" }
         };

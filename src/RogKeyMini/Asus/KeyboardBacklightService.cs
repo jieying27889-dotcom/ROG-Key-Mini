@@ -66,6 +66,38 @@ public sealed class KeyboardBacklightService
         }
     }
 
+    public bool TryIncrease()
+    {
+        try
+        {
+            var lastKnownLevel = GetLastKnownLevel();
+            var nextLevel = Math.Min(GetSafeMaxLevel(), lastKnownLevel + 1);
+
+            if (_asusAcpiService.TrySendKeyboardBacklightUp())
+            {
+                SaveLastKnownLevel(nextLevel);
+                return true;
+            }
+
+            _logService.Warn(
+                $"Keyboard backlight ACPI path failed. Trying HID fallback with estimated level {lastKnownLevel} -> {nextLevel}.");
+
+            if (_asusHidService.TrySetKeyboardBacklightLevel(nextLevel))
+            {
+                SaveLastKnownLevel(nextLevel, "HID");
+                return true;
+            }
+
+            _logService.Warn("Keyboard backlight increase failed on both ACPI and HID paths.");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _logService.Error("Keyboard backlight increase threw an exception.", ex);
+            return false;
+        }
+    }
+
     private int GetLastKnownLevel()
     {
         return Math.Clamp(

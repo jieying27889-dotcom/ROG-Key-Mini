@@ -419,6 +419,7 @@ public sealed class ConfigService
         return action?.Trim() switch
         {
             "KeyboardBacklightDown" => true,
+            "KeyboardBacklightUp" => true,
             "ScreenBrightnessDown" => true,
             "LaunchOsk" => true,
             "ToggleAutoRelease" => true,

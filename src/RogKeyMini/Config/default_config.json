@@ -12,13 +12,13 @@
     "AutoHideDelayMs": 500
   },
   "Hotkeys": {
-    "说明": "全局快捷键设置：支持注册如 Ctrl+2、Alt+7 等组合键，用于触发固定功能。",
-    "SendF2": "Ctrl+2",
-    "SendF7": "Alt+7",
-    "SendMinus": "Alt+9",
-    "SendUnderscore": "Alt+0",
-    "KeyboardBacklightDown": "Alt+[",
-    "ScreenBrightnessDown": "Alt+]",
+    "说明": "全局快捷键设置：支持注册如 Ctrl+Shift+2、Ctrl+Shift+7 等组合键，用于触发固定功能。",
+    "SendF2": "Ctrl+Shift+2",
+    "SendF7": "Ctrl+Shift+7",
+    "SendMinus": "Ctrl+Shift+9",
+    "SendUnderscore": "Ctrl+Shift+0",
+    "KeyboardBacklightDown": "Ctrl+Shift+[",
+    "ScreenBrightnessDown": "Ctrl+Shift+]",
     "ToggleWindow": "Ctrl+Shift+1"
   },
   "Panel": {
@@ -28,35 +28,40 @@
         "Label": "F2",
         "Action": "SendKey",
         "Gesture": "F2",
-        "TriggerHotkey": "Ctrl+2"
+        "TriggerHotkey": "Ctrl+Shift+2"
       },
       {
         "Label": "F7",
         "Action": "SendKey",
         "Gesture": "F7",
-        "TriggerHotkey": "Alt+7"
+        "TriggerHotkey": "Ctrl+Shift+7"
       },
       {
         "Label": "-",
         "Action": "SendKey",
         "Gesture": "-",
-        "TriggerHotkey": "Alt+9"
+        "TriggerHotkey": "Ctrl+Shift+9"
       },
       {
         "Label": "_",
         "Action": "SendKey",
         "Gesture": "_",
-        "TriggerHotkey": "Alt+0"
+        "TriggerHotkey": "Ctrl+Shift+0"
       },
       {
         "Label": "背光-",
         "Action": "KeyboardBacklightDown",
-        "TriggerHotkey": "Alt+["
+        "TriggerHotkey": "Ctrl+Shift+["
+      },
+      {
+        "Label": "背光+",
+        "Action": "KeyboardBacklightUp",
+        "TriggerHotkey": "Ctrl+Shift+]"
       },
       {
         "Label": "亮度-",
         "Action": "ScreenBrightnessDown",
-        "TriggerHotkey": "Alt+]"
+        "TriggerHotkey": ""
       },
       {
         "Label": "OSK",

@@ -18,6 +18,7 @@ public sealed class AsusAcpiService : IDisposable
 
     private const uint UniversalControl = 0x00100021;
     private const int KeyboardBacklightDown = 0x00C5;
+    private const int KeyboardBacklightUp = 0x00C4;
 
     private static readonly IntPtr InvalidHandleValue = new(-1);
 
@@ -53,12 +54,42 @@ public sealed class AsusAcpiService : IDisposable
                 return false;
             }
 
-            _logService.Info($"Keyboard backlight down command sent through Asus ACPI. Result={result}.");
+            _logService.Info("Keyboard backlight down sent via ACPI.");
             return true;
         }
         catch (Exception ex)
         {
-            _logService.Error("Keyboard backlight down threw an exception.", ex);
+            _logService.Error("Keyboard backlight down failed.", ex);
+            return false;
+        }
+    }
+
+    public bool TrySendKeyboardBacklightUp()
+    {
+        try
+        {
+            if (!EnsureConnected())
+            {
+                return false;
+            }
+
+            if (!TryDeviceSet(UniversalControl, KeyboardBacklightUp, "KeyboardBacklightUp", out var result))
+            {
+                return false;
+            }
+
+            if (result is not 0 and not 1)
+            {
+                _logService.Warn($"Keyboard backlight up returned unexpected ACPI result {result}.");
+                return false;
+            }
+
+            _logService.Info("Keyboard backlight up sent via ACPI.");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logService.Error("Keyboard backlight up failed.", ex);
             return false;
         }
     }

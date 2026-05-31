@@ -86,6 +86,11 @@ public partial class MainWindow : Window
         _keyboardBacklightService.TryDecrease();
     }
 
+    public void IncreaseKeyboardBacklight()
+    {
+        _keyboardBacklightService.TryIncrease();
+    }
+
     public void ExecuteConfiguredButton(PanelButtonConfig buttonConfig)
     {
         ExecuteButtonAction(buttonConfig);
@@ -230,6 +235,9 @@ public partial class MainWindow : Window
             case PanelButtonAction.KeyboardBacklightDown:
                 DecreaseKeyboardBacklight();
                 break;
+            case PanelButtonAction.KeyboardBacklightUp:
+                IncreaseKeyboardBacklight();
+                break;
             case PanelButtonAction.ScreenBrightnessDown:
                 DecreaseScreenBrightness();
                 break;
@@ -361,6 +369,7 @@ public partial class MainWindow : Window
         {
             "SENDKEY" => PanelButtonAction.SendKey,
             "KEYBOARDBACKLIGHTDOWN" => PanelButtonAction.KeyboardBacklightDown,
+            "KEYBOARDBACKLIGHTUP" => PanelButtonAction.KeyboardBacklightUp,
             "SCREENBRIGHTNESSDOWN" => PanelButtonAction.ScreenBrightnessDown,
             "LAUNCHOSK" => PanelButtonAction.LaunchOsk,
             "TOGGLEAUTORELEASE" => PanelButtonAction.ToggleAutoRelease,
@@ -375,6 +384,7 @@ internal enum PanelButtonAction
     Unknown,
     SendKey,
     KeyboardBacklightDown,
+    KeyboardBacklightUp,
     ScreenBrightnessDown,
     LaunchOsk,
     ToggleAutoRelease

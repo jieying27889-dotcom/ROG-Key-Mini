@@ -33,6 +33,7 @@ public partial class SettingsWindow : Window
         {
             "SendKey",
             "KeyboardBacklightDown",
+            "KeyboardBacklightUp",
             "ScreenBrightnessDown",
             "LaunchOsk",
             "ToggleAutoRelease"
@@ -294,6 +295,7 @@ public partial class SettingsWindow : Window
         return value?.Trim() switch
         {
             "KeyboardBacklightDown" => "KeyboardBacklightDown",
+            "KeyboardBacklightUp" => "KeyboardBacklightUp",
             "ScreenBrightnessDown" => "ScreenBrightnessDown",
             "LaunchOsk" => "LaunchOsk",
             "ToggleAutoRelease" => "ToggleAutoRelease",
