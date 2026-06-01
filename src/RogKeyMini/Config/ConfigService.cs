@@ -264,6 +264,31 @@ public sealed class ConfigService
 
                 config.Panel.Buttons[i] = button;
             }
+
+            var existingActions = config.Panel.Buttons
+                .Select(b => b.Action?.ToUpperInvariant())
+                .ToHashSet();
+
+            if (!existingActions.Contains("TOGGLEAUTORELEASE"))
+            {
+                config.Panel.Buttons.Add(new PanelButtonConfig { Label = "防粘Alt", Action = "ToggleAutoRelease", TriggerHotkey = "" });
+                normalized = true;
+            }
+
+            if (!existingActions.Contains("TOGGLENOTIFICATION"))
+            {
+                config.Panel.Buttons.Add(new PanelButtonConfig { Label = "通知", Action = "ToggleNotification", TriggerHotkey = "" });
+                normalized = true;
+            }
+
+            if (!existingActions.Contains("KEYBOARDBACKLIGHTUP"))
+            {
+                var backlightDownIndex = config.Panel.Buttons
+                    .FindIndex(b => string.Equals(b.Action, "KeyboardBacklightDown", StringComparison.OrdinalIgnoreCase));
+                var insertAt = backlightDownIndex >= 0 ? backlightDownIndex + 1 : config.Panel.Buttons.Count;
+                config.Panel.Buttons.Insert(insertAt, new PanelButtonConfig { Label = "背光+", Action = "KeyboardBacklightUp", TriggerHotkey = "Ctrl+Shift+]" });
+                normalized = true;
+            }
         }
 
         if (string.IsNullOrWhiteSpace(config.Hotkeys.SendF2))
