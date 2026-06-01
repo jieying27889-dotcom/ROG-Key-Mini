@@ -90,7 +90,8 @@ public sealed class PanelButtonConfig
             new() { Label = "背光+", Action = "KeyboardBacklightUp", TriggerHotkey = "Ctrl+Shift+]" },
             new() { Label = "亮度-", Action = "ScreenBrightnessDown", TriggerHotkey = "" },
             new() { Label = "OSK", Action = "LaunchOsk", TriggerHotkey = "" },
-            new() { Label = "防粘Alt", Action = "ToggleAutoRelease", TriggerHotkey = "" }
+            new() { Label = "防粘Alt", Action = "ToggleAutoRelease", TriggerHotkey = "" },
+            new() { Label = "通知", Action = "ToggleNotification", TriggerHotkey = "" }
         };
     }
 }

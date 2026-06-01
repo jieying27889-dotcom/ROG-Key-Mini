@@ -72,6 +72,11 @@
         "Label": "防粘Alt",
         "Action": "ToggleAutoRelease",
         "TriggerHotkey": ""
+      },
+      {
+        "Label": "通知",
+        "Action": "ToggleNotification",
+        "TriggerHotkey": ""
       }
     ]
   },

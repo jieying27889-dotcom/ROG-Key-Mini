@@ -36,7 +36,8 @@ public partial class SettingsWindow : Window
             "KeyboardBacklightUp",
             "ScreenBrightnessDown",
             "LaunchOsk",
-            "ToggleAutoRelease"
+            "ToggleAutoRelease",
+            "ToggleNotification"
         };
 
         Buttons = new ObservableCollection<PanelButtonConfig>(
@@ -299,6 +300,7 @@ public partial class SettingsWindow : Window
             "ScreenBrightnessDown" => "ScreenBrightnessDown",
             "LaunchOsk" => "LaunchOsk",
             "ToggleAutoRelease" => "ToggleAutoRelease",
+            "ToggleNotification" => "ToggleNotification",
             _ => "SendKey"
         };
     }

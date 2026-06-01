@@ -423,6 +423,7 @@ public sealed class ConfigService
             "ScreenBrightnessDown" => true,
             "LaunchOsk" => true,
             "ToggleAutoRelease" => true,
+            "ToggleNotification" => true,
             _ => false
         };
     }

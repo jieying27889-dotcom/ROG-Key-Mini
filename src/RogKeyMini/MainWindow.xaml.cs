@@ -30,6 +30,7 @@ public partial class MainWindow : Window
     private readonly KeyboardBacklightService _keyboardBacklightService;
 
     private WpfButton? _autoReleaseButton;
+    private WpfButton? _notificationButton;
     private double _windowHeight;
     private double _windowWidth;
     private double _windowLeft;
@@ -60,6 +61,7 @@ public partial class MainWindow : Window
 
         BuildButtons();
         UpdateAutoReleaseButtonVisual();
+        UpdateNotificationButtonVisual();
     }
 
     public bool AllowClose { get; set; }
@@ -114,6 +116,7 @@ public partial class MainWindow : Window
         Opacity = _config.Window.Opacity;
         BuildButtons();
         UpdateAutoReleaseButtonVisual();
+        UpdateNotificationButtonVisual();
         ApplyWindowPosition(ClampWindowPosition(new WpfPoint(_config.Window.Left, _config.Window.Top)));
     }
 
@@ -158,6 +161,7 @@ public partial class MainWindow : Window
     {
         ButtonsHost.Children.Clear();
         _autoReleaseButton = null;
+        _notificationButton = null;
 
         var buttons = _config.Panel.Buttons ?? PanelButtonConfig.CreateDefaults();
         foreach (var buttonConfig in buttons)
@@ -174,6 +178,11 @@ public partial class MainWindow : Window
             if (NormalizeAction(buttonConfig.Action) == PanelButtonAction.ToggleAutoRelease)
             {
                 _autoReleaseButton = button;
+            }
+
+            if (NormalizeAction(buttonConfig.Action) == PanelButtonAction.ToggleNotification)
+            {
+                _notificationButton = button;
             }
 
             ButtonsHost.Children.Add(button);
@@ -247,6 +256,9 @@ public partial class MainWindow : Window
             case PanelButtonAction.ToggleAutoRelease:
                 ToggleAutoRelease();
                 break;
+            case PanelButtonAction.ToggleNotification:
+                ToggleNotification();
+                break;
             default:
                 _logService.Warn($"未知按钮动作：{buttonConfig.Action}。");
                 break;
@@ -291,6 +303,26 @@ public partial class MainWindow : Window
         }
 
         _autoReleaseButton.Foreground = _config.AltMonitor.AutoReleaseEnabled
+            ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 46, 80))
+            : new SolidColorBrush(System.Windows.Media.Color.FromRgb(170, 170, 170));
+    }
+
+    private void ToggleNotification()
+    {
+        _config.AltMonitor.NotificationsEnabled = !_config.AltMonitor.NotificationsEnabled;
+        UpdateNotificationButtonVisual();
+        _configService.Save(_config, _logService);
+        _logService.Info($"通过界面切换了通知状态。当前状态：{_config.AltMonitor.NotificationsEnabled}");
+    }
+
+    private void UpdateNotificationButtonVisual()
+    {
+        if (_notificationButton is null)
+        {
+            return;
+        }
+
+        _notificationButton.Foreground = _config.AltMonitor.NotificationsEnabled
             ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 46, 80))
             : new SolidColorBrush(System.Windows.Media.Color.FromRgb(170, 170, 170));
     }
@@ -373,6 +405,7 @@ public partial class MainWindow : Window
             "SCREENBRIGHTNESSDOWN" => PanelButtonAction.ScreenBrightnessDown,
             "LAUNCHOSK" => PanelButtonAction.LaunchOsk,
             "TOGGLEAUTORELEASE" => PanelButtonAction.ToggleAutoRelease,
+            "TOGGLENOTIFICATION" => PanelButtonAction.ToggleNotification,
             _ => PanelButtonAction.Unknown
         };
     }
@@ -387,5 +420,6 @@ internal enum PanelButtonAction
     KeyboardBacklightUp,
     ScreenBrightnessDown,
     LaunchOsk,
-    ToggleAutoRelease
+    ToggleAutoRelease,
+    ToggleNotification
 }
